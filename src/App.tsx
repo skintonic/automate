@@ -14,6 +14,7 @@ import { HaroQuery, GmailEmailMessage, DigestProcessingResult, ActivityLogEntry,
 import { initAuth, googleSignIn, logout as firebaseLogout, getAccessToken, setAccessToken } from './lib/firebase';
 import { searchGmailMessages, createGmailDraft, sendGmailMessage, checkThreadEngagement } from './lib/gmail';
 import { getCuratedJournalistIntel } from './lib/journalistIntel';
+import { parseAndEvaluateQueriesRuleBased } from './lib/ruleEngine';
 import { SAMPLE_DIGESTS } from './data/sampleDigests';
 import { User as FirebaseUser } from 'firebase/auth';
 import { ShieldCheck, Sparkles, CheckCircle2, AlertTriangle, Info, RefreshCw, Mail, UserCheck, Send, BarChart3 } from 'lucide-react';
@@ -147,19 +148,31 @@ export default function App() {
   ) => {
     setIsProcessing(true);
     try {
-      const res = await fetch('/api/process-queries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText }),
-      });
+      let rawQueries: any[] = [];
+      let summaryText = '';
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Processing failed with status ${res.status}`);
+      // Try calling the backend API if available
+      try {
+        const res = await fetch('/api/process-queries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rawText }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          rawQueries = data.queries || [];
+          summaryText = data.summary || '';
+        }
+      } catch (apiErr) {
+        console.warn('Backend API unavailable, using in-browser rule engine fallback:', apiErr);
       }
 
-      const data = await res.json();
-      const rawQueries = data.queries || [];
+      // If backend was unreachable (e.g. static hosting on GitHub Pages), run client-side rule engine
+      if (rawQueries.length === 0) {
+        rawQueries = parseAndEvaluateQueriesRuleBased(rawText);
+        summaryText = `Processed ${rawQueries.length} opportunities via clinical routing engine.`;
+      }
 
       // Map to HaroQuery objects with fallback timestamps and status
       const mappedQueries: HaroQuery[] = rawQueries.map((q: any, idx: number) => {
@@ -231,7 +244,7 @@ export default function App() {
       });
 
       setQueries(mappedQueries);
-      setProcessingSummary(data.summary || `Extracted and routed ${mappedQueries.length} queries.`);
+      setProcessingSummary(summaryText || `Extracted and routed ${mappedQueries.length} queries.`);
 
       // Log ingestion activities
       const now = new Date();

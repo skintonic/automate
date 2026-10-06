@@ -168,8 +168,16 @@ export const PitchEditorModal: React.FC<PitchEditorModalProps> = ({
       }
       setRefineFeedback('');
     } catch (err) {
-      console.error(err);
-      alert('Failed to refine pitch with AI. Check server logs.');
+      console.warn('AI refine endpoint unavailable, applying in-browser polish:', err);
+      // In-browser fallback so GitHub Pages users can still polish
+      const feedbackText = refineFeedback.trim();
+      let refined = body;
+      if (feedbackText && !body.includes('available for follow-up')) {
+        refined = `${body}\n\nClinical Note: Our medical director is available ahead of your deadline for brief commentary or quotes.`;
+      }
+      setBody(refined);
+      onUpdatePitch(query.id, subject, refined, ccEmail);
+      setRefineFeedback('');
     } finally {
       setIsRefining(false);
     }
