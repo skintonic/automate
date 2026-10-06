@@ -1,0 +1,6 @@
+{
+  "name": "HARO Pitch Assistant",
+  "description": "HARO and Connectively pitch assistant that searches digest emails, filters queries, routes to medical brands, drafts tailored pitches, and saves them as Gmail drafts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
